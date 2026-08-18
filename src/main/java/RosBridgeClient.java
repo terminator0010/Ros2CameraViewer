@@ -33,6 +33,8 @@ public class RosBridgeClient {
                 public void onOpen(ServerHandshake handshakedata) {
                     System.out.println("Conectado ao rosbridge!");
                     gui.setStatus("Conectado ao servidor ROS 2.");
+                    
+                    javax.swing.JOptionPane.showMessageDialog(gui, "Conexão feita com sucesso!");
 
                     // Envia o comando ROSBridge v2 para assinar o tópico
                     JSONObject subscribeMsg = new JSONObject();
@@ -67,15 +69,13 @@ public class RosBridgeClient {
                 @Override
                 public void onClose(int code, String reason, boolean remote) {
                     System.out.println("Conexão fechada: " + reason);
-                    gui.setStatus("Conexão fechada. Reconectando em " + (reconnectIntervalMs / 1000) + "s...");
-                    scheduleReconnect();
+                    scheduleReconnect("Conexão fechada.");
                 }
 
                 @Override
                 public void onError(Exception ex) {
                     System.err.println("Não foi possível conectar com o Ros2_bridge. Verifique se o servidor está rodando.");
-                    gui.setStatus("Falha na conexão. Reconectando em " + (reconnectIntervalMs / 1000) + "s...");
-                    scheduleReconnect();
+                    scheduleReconnect("Falha na conexão.");
                 }
             };
 
@@ -83,20 +83,30 @@ public class RosBridgeClient {
 
         } catch (Exception e) {
             System.err.println("Erro ao configurar o endereço do servidor.");
-            scheduleReconnect();
+            scheduleReconnect("Erro de configuração.");
         }
     }
 
-    private synchronized void scheduleReconnect() {
+    private synchronized void scheduleReconnect(String reasonMsg) {
         if (!isReconnecting) {
             isReconnecting = true;
-            timer.schedule(new TimerTask() {
+            final int[] secondsLeft = {reconnectIntervalMs / 1000};
+            
+            Timer countdownTimer = new Timer();
+            countdownTimer.scheduleAtFixedRate(new TimerTask() {
                 @Override
                 public void run() {
-                    isReconnecting = false;
-                    connect();
+                    if (secondsLeft[0] > 0) {
+                        gui.setStatus(reasonMsg + " Reconectando em " + secondsLeft[0] + "s...");
+                        secondsLeft[0]--;
+                    } else {
+                        gui.setStatus("Reconectando...");
+                        countdownTimer.cancel();
+                        isReconnecting = false;
+                        connect();
+                    }
                 }
-            }, reconnectIntervalMs);
+            }, 0, 1000);
         }
     }
 }
