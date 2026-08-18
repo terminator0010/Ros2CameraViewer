@@ -3,13 +3,24 @@ import org.java_websocket.handshake.ServerHandshake;
 import org.json.JSONObject;
 
 import java.net.URI;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class RosBridgeClient {
     private WebSocketClient webSocketClient;
     private RosCameraGUI gui;
+    
+    // Variável para configurar o tempo de reconexão (em milissegundos)
+    private int reconnectIntervalMs = 5000; 
+    private Timer timer = new Timer();
+    private boolean isReconnecting = false;
 
     public RosBridgeClient(RosCameraGUI gui) {
         this.gui = gui;
+    }
+    
+    public void setReconnectIntervalMs(int ms) {
+        this.reconnectIntervalMs = ms;
     }
 
     public void connect() {
@@ -21,6 +32,7 @@ public class RosBridgeClient {
                 @Override
                 public void onOpen(ServerHandshake handshakedata) {
                     System.out.println("Conectado ao rosbridge!");
+                    gui.setStatus("Conectado ao servidor ROS 2.");
 
                     // Envia o comando ROSBridge v2 para assinar o tópico
                     JSONObject subscribeMsg = new JSONObject();
@@ -55,12 +67,15 @@ public class RosBridgeClient {
                 @Override
                 public void onClose(int code, String reason, boolean remote) {
                     System.out.println("Conexão fechada: " + reason);
+                    gui.setStatus("Conexão fechada. Reconectando em " + (reconnectIntervalMs / 1000) + "s...");
+                    scheduleReconnect();
                 }
 
                 @Override
                 public void onError(Exception ex) {
                     System.err.println("Não foi possível conectar com o Ros2_bridge. Verifique se o servidor está rodando.");
-                    gui.setStatus("Falha na conexão com o servidor ROS 2.");
+                    gui.setStatus("Falha na conexão. Reconectando em " + (reconnectIntervalMs / 1000) + "s...");
+                    scheduleReconnect();
                 }
             };
 
@@ -68,6 +83,20 @@ public class RosBridgeClient {
 
         } catch (Exception e) {
             System.err.println("Erro ao configurar o endereço do servidor.");
+            scheduleReconnect();
+        }
+    }
+
+    private synchronized void scheduleReconnect() {
+        if (!isReconnecting) {
+            isReconnecting = true;
+            timer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    isReconnecting = false;
+                    connect();
+                }
+            }, reconnectIntervalMs);
         }
     }
 }
