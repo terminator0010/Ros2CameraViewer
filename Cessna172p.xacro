@@ -1,0 +1,173 @@
+<?xml version="1.0"?>
+<robot name="cessna_172" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- =================================================================== -->
+  <!-- 1. PROPRIEDADES E DIRETÓRIOS (Ajuste o nome do pacote)              -->
+  <!-- =================================================================== -->
+  <xacro:property name="pkg_name" value="seu_pacote_cessna" />
+  <xacro:property name="mesh_path" value="package://${pkg_name}/meshes" />
+  <xacro:property name="PI" value="3.14159265359" />
+
+  <!-- =================================================================== -->
+  <!-- 2. MACROS DE INÉRCIA DETERMINÍSTICA                                 -->
+  <!-- =================================================================== -->
+  <xacro:macro name="box_inertia" params="m x y z">
+    <inertial>
+      <mass value="${m}" />
+      <inertia ixx="${m/12 * (y*y + z*z)}" ixy="0.0" ixz="0.0" 
+               iyy="${m/12 * (x*x + z*z)}" iyz="0.0" 
+               izz="${m/12 * (x*x + y*y)}" />
+    </inertial>
+  </xacro:macro>
+
+  <xacro:macro name="cylinder_inertia" params="m r h">
+    <inertial>
+      <mass value="${m}" />
+      <inertia ixx="${m/12 * (3*r*r + h*h)}" ixy="0.0" ixz="0.0" 
+               iyy="${m/12 * (3*r*r + h*h)}" iyz="0.0" 
+               izz="${m/2 * (r*r)}" />
+    </inertial>
+  </xacro:macro>
+
+  <!-- =================================================================== -->
+  <!-- 3. LINK PRINCIPAL: FUSELAGEM (Base Link)                            -->
+  <!-- =================================================================== -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="${mesh_path}/visual/fuselage.dae" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="${mesh_path}/collision/fuselage_collision.stl" />
+      </geometry>
+    </collision>
+    <!-- Massa do Cessna 172 vazio é de aprox. 760kg -->
+    <xacro:box_inertia m="760.0" x="8.2" y="1.2" z="1.5" />
+  </link>
+
+  <!-- =================================================================== -->
+  <!-- 4. HÉLICE (Propeller)                                               -->
+  <!-- =================================================================== -->
+  <link name="propeller_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="${mesh_path}/visual/propeller.dae" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <cylinder radius="0.95" length="0.1" /> <!-- Cilindro simplificado para colisão -->
+      </geometry>
+    </collision>
+    <xacro:cylinder_inertia m="15.0" r="0.95" h="0.1" />
+  </link>
+
+  <joint name="propeller_joint" type="continuous">
+    <!-- Posição estimada do nariz do avião -->
+    <origin xyz="2.1 0.0 0.1" rpy="0 0 0" /> 
+    <parent link="base_link" />
+    <child link="propeller_link" />
+    <!-- Eixo X aponta para a frente, hélice gira ao redor dele -->
+    <axis xyz="1 0 0" /> 
+  </joint>
+
+  <!-- =================================================================== -->
+  <!-- 5. MACRO PARA AILERONS ESPELHADOS                                   -->
+  <!-- =================================================================== -->
+  <xacro:macro name="aileron" params="side reflect">
+    <link name="aileron_${side}_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="${mesh_path}/visual/aileron_${side}.dae" />
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="${mesh_path}/collision/aileron_${side}_collision.stl" />
+        </geometry>
+      </collision>
+      <xacro:box_inertia m="3.0" x="0.3" y="2.0" z="0.05" />
+    </link>
+
+    <joint name="aileron_${side}_joint" type="revolute">
+      <!-- Posição estimada na borda de fuga da asa -->
+      <!-- 'reflect' inverte o eixo Y para o lado direito -->
+      <origin xyz="-0.5 ${3.5 * reflect} 0.6" rpy="0 0 0" />
+      <parent link="base_link" />
+      <child link="aileron_${side}_link" />
+      <axis xyz="0 1 0" />
+      <!-- Limites físicos: ~20 graus (0.349 rad) -->
+      <limit lower="-0.349" upper="0.349" effort="50.0" velocity="2.0" />
+    </joint>
+  </xacro:macro>
+
+  <xacro:aileron side="left" reflect="1" />
+  <xacro:aileron side="right" reflect="-1" />
+
+  <!-- =================================================================== -->
+  <!-- 6. PROFUNDOR (Elevator)                                             -->
+  <!-- =================================================================== -->
+  <link name="elevator_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="${mesh_path}/visual/elevator.dae" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="${mesh_path}/collision/elevator_collision.stl" />
+      </geometry>
+    </collision>
+    <xacro:box_inertia m="5.0" x="0.4" y="3.0" z="0.05" />
+  </link>
+
+  <joint name="elevator_joint" type="revolute">
+    <!-- Posição estimada na cauda horizontal -->
+    <origin xyz="-5.0 0.0 0.2" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="elevator_link" />
+    <axis xyz="0 1 0" />
+    <!-- Limites físicos: ~28 graus para cima, ~23 graus para baixo -->
+    <limit lower="-0.4" upper="0.48" effort="100.0" velocity="2.0" />
+  </joint>
+
+  <!-- =================================================================== -->
+  <!-- 7. LEME (Rudder)                                                    -->
+  <!-- =================================================================== -->
+  <link name="rudder_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="${mesh_path}/visual/rudder.dae" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="${mesh_path}/collision/rudder_collision.stl" />
+      </geometry>
+    </collision>
+    <xacro:box_inertia m="4.0" x="0.5" y="0.05" z="1.5" />
+  </link>
+
+  <joint name="rudder_joint" type="revolute">
+    <!-- Posição estimada na cauda vertical -->
+    <origin xyz="-5.2 0.0 1.2" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="rudder_link" />
+    <axis xyz="0 0 1" />
+    <!-- Limites físicos: ~16 graus para cada lado -->
+    <limit lower="-0.28" upper="0.28" effort="80.0" velocity="2.0" />
+  </joint>
+
+</robot>

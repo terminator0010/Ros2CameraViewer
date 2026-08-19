@@ -9,16 +9,15 @@ import java.util.TimerTask;
 public class RosBridgeClient {
     private WebSocketClient webSocketClient;
     private RosCameraGUI gui;
-    
+
     // Variável para configurar o tempo de reconexão (em milissegundos)
-    private int reconnectIntervalMs = 5000; 
-    private Timer timer = new Timer();
+    private int reconnectIntervalMs = 5000;
     private boolean isReconnecting = false;
 
     public RosBridgeClient(RosCameraGUI gui) {
         this.gui = gui;
     }
-    
+
     public void setReconnectIntervalMs(int ms) {
         this.reconnectIntervalMs = ms;
     }
@@ -33,7 +32,7 @@ public class RosBridgeClient {
                 public void onOpen(ServerHandshake handshakedata) {
                     System.out.println("Conectado ao rosbridge!");
                     gui.setStatus("Conectado ao servidor ROS 2.");
-                    
+
                     javax.swing.JOptionPane.showMessageDialog(gui, "Conexão feita com sucesso!");
 
                     // Envia o comando ROSBridge v2 para assinar o tópico
@@ -74,7 +73,8 @@ public class RosBridgeClient {
 
                 @Override
                 public void onError(Exception ex) {
-                    System.err.println("Não foi possível conectar com o Ros2_bridge. Verifique se o servidor está rodando.");
+                    System.err.println(
+                            "Não foi possível conectar com o Ros2_bridge. Verifique se o servidor está rodando.");
                     scheduleReconnect("Falha na conexão.");
                 }
             };
@@ -90,8 +90,8 @@ public class RosBridgeClient {
     private synchronized void scheduleReconnect(String reasonMsg) {
         if (!isReconnecting) {
             isReconnecting = true;
-            final int[] secondsLeft = {reconnectIntervalMs / 1000};
-            
+            final int[] secondsLeft = { reconnectIntervalMs / 1000 };
+
             Timer countdownTimer = new Timer();
             countdownTimer.scheduleAtFixedRate(new TimerTask() {
                 @Override
